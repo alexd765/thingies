@@ -12,6 +12,8 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	"log"
+	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -52,6 +54,11 @@ func Handle(evt json.RawMessage, ctx *runtime.Context) (interface{}, error) {
 		return nil, err
 	}
 
+	result := Result{
+		Version:     3,
+		OutputToken: strings.TrimSuffix(task.InputToken, filepath.Ext(task.InputToken)) + ".png",
+	}
+
 	obj, err := s3Client.GetObject(&s3.GetObjectInput{Bucket: aws.String("thingies-input"), Key: aws.String(task.InputToken)})
 	if err != nil {
 		return nil, err
@@ -69,17 +76,13 @@ func Handle(evt json.RawMessage, ctx *runtime.Context) (interface{}, error) {
 
 	_, err = s3Client.PutObject(&s3.PutObjectInput{
 		Bucket: aws.String("thingies-output"),
-		Key:    aws.String(task.InputToken),
+		Key:    aws.String(result.OutputToken),
 		Body:   bytes.NewReader(buf.Bytes()),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	result := Result{
-		Version:     3,
-		OutputToken: task.InputToken,
-	}
 	return result, nil
 }
 
