@@ -3,9 +3,14 @@ package main
 import "C"
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	"image/png"
 	"log"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -13,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/eawsy/aws-lambda-go-core/service/lambda/runtime"
+	"github.com/harrydb/go/img/grayscale"
 )
 
 // Task is the input of our lambda function.
@@ -25,23 +31,19 @@ type Task struct {
 type Result struct {
 	Version     int    `json:"version"`
 	OutputToken string `json:"output-token"`
-	Size        int    `json:"size"`
 }
 
-var s3Client *s3.S3
+// Handle is our lambda function.
+func Handle(evt json.RawMessage, ctx *runtime.Context) (interface{}, error) {
 
-func init() {
 	creds := credentials.NewEnvCredentials()
 	_, err := creds.Get()
 	if err != nil {
 		log.Fatalf("failed to get creds: %s", err)
 	}
 	sess := session.New(aws.NewConfig().WithRegion("eu-west-1").WithCredentials(creds))
-	s3Client = s3.New(sess)
-}
+	s3Client := s3.New(sess)
 
-// Handle is our lambda function.
-func Handle(evt json.RawMessage, ctx *runtime.Context) (interface{}, error) {
 	var task Task
 	if err := json.Unmarshal(evt, &task); err != nil {
 		return nil, err
@@ -54,14 +56,29 @@ func Handle(evt json.RawMessage, ctx *runtime.Context) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	var size int
-	if obj.ContentLength != nil {
-		size = int(*obj.ContentLength)
+	defer obj.Body.Close()
+	img, _, err := image.Decode(obj.Body)
+	if err != nil {
+		return nil, err
 	}
+	grayImg := grayscale.Convert(img, grayscale.ToGrayLuminance)
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, grayImg); err != nil {
+		return nil, err
+	}
+
+	_, err = s3Client.PutObject(&s3.PutObjectInput{
+		Bucket: aws.String("thingies-output"),
+		Key:    aws.String(task.InputToken),
+		Body:   bytes.NewReader(buf.Bytes()),
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	result := Result{
-		Version:     2,
+		Version:     3,
 		OutputToken: task.InputToken,
-		Size:        size,
 	}
 	return result, nil
 }
