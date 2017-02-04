@@ -14,24 +14,47 @@ const s3 = new AWS.S3({
     params: { Bucket: bucketName }
 })
 
-function convert() {
+function upload() {
     const files = document.getElementById("select-files").files
     if (!files.length) {
         msg('please select an image')
         return
     }
     const file = files[0]
+    const token = generateToken(file.name)
 
+    msg('uploading...')
     s3.upload({
-        Key: generateToken(file.name),
+        Key: token,
         Body: file,
-    }, function(err, data) {
-        if (err) {
-            msg('upload failed: ' + err.message)
-            return
-        }
-        msg('upload sucessful')
-    })
+    }, convert)
+}
+
+function convert(err, data) {
+    if (err) {
+        msg('upload failed: ' + err.message)
+        return
+    }
+    msg('upload sucessful. converting ...')
+
+    var req = new XMLHttpRequest()
+    req.open("POST", "https://vvk4r5qg29.execute-api.eu-west-1.amazonaws.com/prod")
+    req.setRequestHeader("Content-Type", "application/json")
+    req.onreadystatechange = download
+    req.send(JSON.stringify({ version: 1, "input-token": data.key }))
+
+}
+
+function download() {
+    if (this.readyState != XMLHttpRequest.DONE) {
+        return
+    }
+    const resp = JSON.parse(this.responseText)
+    if (resp.version != 1 || resp.outputToken == "") {
+        msg('convert unsuccessful')
+        return
+    }
+    msg('convert sucessful')
 }
 
 function generateToken(filename) {
