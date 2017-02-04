@@ -50,11 +50,11 @@ function download() {
         return
     }
     const resp = JSON.parse(this.responseText)
-    if (resp.version != 1 || resp.outputToken == "") {
+    if (resp.version != 2 || resp.outputToken == "") {
         msg('convert unsuccessful')
         return
     }
-    msg('convert sucessful')
+    msg('convert sucessful. size: ' + resp.size)
 }
 
 function generateToken(filename) {
