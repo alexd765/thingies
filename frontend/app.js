@@ -1,4 +1,5 @@
-const bucketName = 'thingies-input'
+const bucketInput = 'thingies-input'
+const bucketOutput = 'thingies-output'
 const region = 'eu-west-1'
 const identityPool = 'eu-west-1:c4de6544-663a-40bd-a017-2e0924f55ca1'
 
@@ -11,7 +12,6 @@ AWS.config.update({
 
 const s3 = new AWS.S3({
     apiVersion: '2006-03-01',
-    params: { Bucket: bucketName }
 })
 
 function upload() {
@@ -26,6 +26,7 @@ function upload() {
     msg('uploading...')
     s3.upload({
         Key: token,
+        Bucket: bucketInput,
         Body: file,
     }, convert)
 }
@@ -51,11 +52,13 @@ function download() {
         return
     }
     const resp = JSON.parse(this.responseText)
-    if (resp.version != 2 || resp.outputToken == "") {
+    if (resp.version != 3 || resp["output-token"] == "") {
         msg('convert unsuccessful')
         return
     }
-    msg('convert sucessful. size: ' + resp.size)
+    console.log("resp", resp)
+    msg('convert sucessful. downloading...')
+    displayImageOutput(resp["output-token"])
 }
 
 function generateToken(filename) {
@@ -70,9 +73,18 @@ function msg(text) {
 function displayImageInput(token) {
     const url = s3.getSignedUrl('getObject', {
         Key: token,
-        Bucket: bucketName
+        Bucket: bucketInput
     })
     document.getElementById("input-image").src = url
+}
+
+function displayImageOutput(token) {
+    console.log("token: ", token)
+    const url = s3.getSignedUrl('getObject', {
+        Key: token,
+        Bucket: bucketOutput
+    })
+    document.getElementById("output-image").src = url
 }
 
 function rand() {
