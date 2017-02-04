@@ -43,6 +43,7 @@ function convert(err, data) {
     req.onreadystatechange = download
     req.send(JSON.stringify({ version: 1, "input-token": data.key }))
 
+    displayImageInput(data.key)
 }
 
 function download() {
@@ -64,6 +65,14 @@ function generateToken(filename) {
 
 function msg(text) {
     document.getElementById("message").innerHTML = text
+}
+
+function displayImageInput(token) {
+    const url = s3.getSignedUrl('getObject', {
+        Key: token,
+        Bucket: bucketName
+    })
+    document.getElementById("input-image").src = url
 }
 
 function rand() {
